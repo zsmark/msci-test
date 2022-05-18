@@ -7,6 +7,8 @@ import org.springframework.jms.core.JmsTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.IntStream;
 
 @Slf4j
@@ -20,8 +22,14 @@ public class ProducerServiceImpl implements ProducerService {
 
     @Async
     @Override
-    public void sendMessage(int messageCount, String prefix) {
+    public void sendMessageByCountAndPrefix(int messageCount, String prefix) {
         log.info("Sending {} message with prefix {}", messageCount, prefix);
-        IntStream.range(0, messageCount).forEach(i -> jmsTemplate.convertAndSend(MESSAGE_QUEUE_NAME, prefix + i));
+        IntStream.range(0, messageCount).forEach(i -> sendMessage(prefix + i));
+    }
+
+    @Override
+    public void sendMessage(String message) {
+        log.info("Sending message {}", message);
+        jmsTemplate.convertAndSend(MESSAGE_QUEUE_NAME, message);
     }
 }
