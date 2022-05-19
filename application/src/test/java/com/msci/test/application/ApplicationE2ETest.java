@@ -68,7 +68,6 @@ public class ApplicationE2ETest {
             IntStream.range(0, 10).parallel().forEach(i -> {
                 String message = prefix + i;
                 messages.add(message);
-                producerService.sendMessage(message);
             });
         });
 
