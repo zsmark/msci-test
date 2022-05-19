@@ -6,6 +6,7 @@ import com.msci.test.repository.ProcessedMessageRepository;
 import lombok.SneakyThrows;
 import org.awaitility.Duration;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,18 +33,46 @@ public class ApplicationE2ETest {
     private ProcessedMessageRepository processedMessageRepository;
 
     @Test
-    public void test() {
+    @Disabled
+    public void whenProducersSendDatasOnMultipleThreads_shouldPreserveMessageOrder() {
         List<String> messages = new ArrayList<>();
         Stream.of("A", "B", "C", "D").forEach(prefix -> {
-           Runnable runnable = () ->
-                IntStream.range(0, 10).forEach(i -> {
+            Runnable runnable = () ->
+                    IntStream.range(0, 10).forEach(i -> {
                         String message = prefix + i;
                         messages.add(message);
                         producerService.sendMessage(message);
-                });
-           Thread thread = new Thread(runnable);
-           thread.start();
+                    });
+            Thread thread = new Thread(runnable);
+            thread.start();
         });
+
+        await()
+                .atMost(Duration.ONE_MINUTE)
+                .with()
+                .pollInterval(Duration.ONE_HUNDRED_MILLISECONDS)
+                .until(() -> processedMessageRepository.count() == messages.size());
+
+        List<String> processedMessageListWithoutPostfix = processedMessageRepository.findAllByOrderByIdAsc().stream()
+                .map(ProcessedMessage::getMessage)
+                .map(message -> message.replace("processed", ""))
+                .collect(Collectors.toList());
+
+        Assertions.assertArrayEquals(messages.toArray(new String[]{}), processedMessageListWithoutPostfix.toArray());
+    }
+
+    @Test
+    public void whenProducersGenerateDataFirst_shouldPreserveMessageOrder() {
+        List<String> messages = new ArrayList<>();
+        Stream.of("A", "B", "C", "D").parallel().forEach(prefix -> {
+            IntStream.range(0, 10).parallel().forEach(i -> {
+                String message = prefix + i;
+                messages.add(message);
+                producerService.sendMessage(message);
+            });
+        });
+
+        messages.forEach(message -> producerService.sendMessage(message));
 
         await()
                 .atMost(Duration.ONE_MINUTE)
